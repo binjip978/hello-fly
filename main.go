@@ -53,7 +53,7 @@ func hello(w http.ResponseWriter, r *http.Request) {
 }
 
 func fly(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("<html><h1>Hello Fly</h1></html>"))
+	w.Write([]byte("<html><h1>Hello Fly v2</h1></html>"))
 }
 
 func mux() http.Handler {
