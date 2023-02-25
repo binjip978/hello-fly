@@ -56,6 +56,10 @@ func fly(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("<html><h1>Hello Fly v2</h1></html>"))
 }
 
+func musk(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("nano-manager"))
+}
+
 func mux() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", healthz)

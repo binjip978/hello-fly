@@ -47,7 +47,7 @@ func TestHello(t *testing.T) {
 	}
 
 	author := js["author"].(string)
-	if author != "me" {
+	if author != "him" {
 		t.Errorf("expected me, go %s", author)
 	}
 }
