@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
@@ -10,24 +11,35 @@ import (
 )
 
 type server struct {
-	srv *http.Server
+	srv      *http.Server
+	user     string
+	password string
 }
 
-func newServer(address string, mux http.Handler) server {
-	return server{
+func newServer(address string) *server {
+	s := server{
 		srv: &http.Server{
-			Addr:    address,
-			Handler: mux,
+			Addr: address,
 		},
 	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", s.healthz)
+	mux.HandleFunc("/hello", s.hello)
+	mux.HandleFunc("/fly", s.fly)
+	mux.HandleFunc("/secret", s.secret)
+	mux.HandleFunc("/", s.hello)
+	s.srv.Handler = mux
+
+	return &s
 }
 
-func healthz(w http.ResponseWriter, r *http.Request) {
+func (s *server) healthz(w http.ResponseWriter, r *http.Request) {
 	log.Println("/healthz")
 	w.WriteHeader(http.StatusOK)
 }
 
-func hello(w http.ResponseWriter, r *http.Request) {
+func (s *server) hello(w http.ResponseWriter, r *http.Request) {
 	log.Println("serving hello request")
 	v := rand.Float64()
 	var hostname string
@@ -52,21 +64,61 @@ func hello(w http.ResponseWriter, r *http.Request) {
 	w.Write(b)
 }
 
-func fly(w http.ResponseWriter, r *http.Request) {
+func (s *server) fly(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("<html><h1>Hello Fly v2</h1></html>"))
 }
 
-func mux() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/healthz", healthz)
-	mux.HandleFunc("/hello", hello)
-	mux.HandleFunc("/fly", fly)
-	mux.HandleFunc("/", hello)
-	return mux
+func (s *server) secret(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	username, password, ok := r.BasicAuth()
+	// THIS IS SECURE
+	if !ok || username != s.user || password != s.password {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer r.Body.Close()
+
+	coords := make(map[string]float64)
+	err = json.Unmarshal(b, &coords)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// echo coordinates back
+	b, err = json.Marshal(&coords)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(b)
 }
 
 func main() {
-	s := newServer(":8080", mux())
+	// SANE DEFAULTS
+	user := os.Getenv("FLY_USER")
+	if user == "" {
+		user = "user"
+	}
+	password := os.Getenv("FLY_PASSWORD")
+	if password == "" {
+		password = "password"
+	}
+
+	s := newServer(":8080")
+	s.user = user
+	s.password = password
 	log.Printf("starting web-server on :8080")
 	log.Fatal(s.srv.ListenAndServe())
 }
